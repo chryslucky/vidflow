@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import Loader from './components/Loader';
 import Onboarding from './components/Onboarding';
 import Navbar from './components/Navbar';
@@ -601,6 +602,7 @@ export default function App() {
       {showAd && <AdModal onClose={() => setShowAd(false)} />}
 
       <ScrollToTop />
+      <SpeedInsights />
     </div>
   );
 }
