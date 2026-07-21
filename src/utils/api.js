@@ -44,16 +44,67 @@ export async function getVideoDetails(ids) {
   return results;
 }
 
-export async function searchVideos(query, maxResults = 20, pageToken = '', useCache = true) {
+// FIXED: Proper search that returns actual results
+export async function searchVideos(query, maxResults = 25, pageToken = '', useCache = true) {
+  if (!query || !query.trim()) return null;
   const params = {
     part: 'snippet',
-    q: query,
+    q: query.trim(),
     type: 'video',
-    maxResults,
+    maxResults: Math.min(maxResults, 50),
     order: 'relevance',
+    safeSearch: 'none',
   };
   if (pageToken) params.pageToken = pageToken;
   return ytApi('search', params, useCache);
+}
+
+// New: full-featured search that returns detailed videos
+export async function searchVideosFull(query, maxResults = 25, pageToken = '') {
+  const searchData = await searchVideos(query, maxResults, pageToken, false);
+  if (!searchData?.items?.length) return { videos: [], nextPageToken: null };
+  
+  const ids = searchData.items
+    .map(i => i.id?.videoId)
+    .filter(Boolean);
+  
+  if (!ids.length) return { videos: [], nextPageToken: searchData.nextPageToken };
+  
+  const details = await getVideoDetails(ids);
+  
+  // Preserve search order
+  const detailsMap = new Map(details.map(d => [d.id, d]));
+  const ordered = ids.map(id => detailsMap.get(id)).filter(Boolean);
+  
+  return { 
+    videos: ordered, 
+    nextPageToken: searchData.nextPageToken || null 
+  };
+}
+
+export async function searchShorts(query, maxResults = 15, pageToken = '') {
+  if (!query || !query.trim()) return { items: [] };
+  const params = {
+    part: 'snippet',
+    q: query.trim() + ' #shorts',
+    type: 'video',
+    videoDuration: 'short',
+    maxResults: Math.min(maxResults, 50),
+    order: 'relevance',
+    safeSearch: 'none',
+  };
+  if (pageToken) params.pageToken = pageToken;
+  return ytApi('search', params, false);
+}
+
+export async function searchChannels(query, maxResults = 5) {
+  if (!query || !query.trim()) return { items: [] };
+  return ytApi('search', {
+    part: 'snippet',
+    q: query.trim(),
+    type: 'channel',
+    maxResults,
+  }, false);
 }
 
 export async function getPopularVideos(regionCode = 'US', maxResults = 50, pageToken = '', categoryId = '', useCache = true) {
@@ -83,6 +134,7 @@ export async function getShorts(query = 'trending shorts', maxResults = 24, regi
 }
 
 export async function getChannelInfo(channelId) {
+  if (!channelId) return null;
   return ytApi('channels', {
     part: 'snippet,statistics,brandingSettings',
     id: channelId,
@@ -90,6 +142,7 @@ export async function getChannelInfo(channelId) {
 }
 
 export async function getChannelVideos(channelId, maxResults = 12) {
+  if (!channelId) return null;
   return ytApi('search', {
     part: 'snippet',
     channelId,
@@ -100,9 +153,10 @@ export async function getChannelVideos(channelId, maxResults = 12) {
 }
 
 export async function getSuggestions(query) {
+  if (!query || !query.trim()) return { items: [] };
   return ytApi('search', {
     part: 'snippet',
-    q: query,
+    q: query.trim(),
     type: 'video',
     maxResults: 7,
   });

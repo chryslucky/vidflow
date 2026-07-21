@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiMenu, FiSearch, FiMic, FiBookmark, FiArrowRight, FiCornerDownLeft, FiRefreshCw } from 'react-icons/fi';
 import Logo from './Logo';
 import { getSuggestions } from '../utils/api';
 
-export default function Navbar({ user, onMenuToggle, onSearch, onPlaylist, onSettings, onRefresh }) {
+export default function Navbar({ user, onMenuToggle, onPlaylist, onSettings, onRefresh }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSug, setShowSug] = useState(false);
@@ -26,11 +28,11 @@ export default function Navbar({ user, onMenuToggle, onSearch, onPlaylist, onSet
   }, []);
 
   const doSearch = useCallback((q) => {
-    const searchQuery = q || query;
-    if (!searchQuery.trim()) return;
+    const searchQuery = (q || query).trim();
+    if (!searchQuery) return;
     setShowSug(false);
-    onSearch?.(searchQuery.trim());
-  }, [query, onSearch]);
+    navigate(`/search/${encodeURIComponent(searchQuery)}`);
+  }, [query, navigate]);
 
   const startVoice = useCallback(() => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
@@ -74,7 +76,7 @@ export default function Navbar({ user, onMenuToggle, onSearch, onPlaylist, onSet
           <button className="p-2 hover:bg-vf-card rounded-xl transition-colors lg:hidden" onClick={onMenuToggle}>
             <FiMenu size={20} />
           </button>
-          <div className="lg:hidden">
+          <div className="lg:hidden cursor-pointer" onClick={() => navigate('/')}>
             <Logo size="xs" showText={false} />
           </div>
 

@@ -1,27 +1,41 @@
-import React, { useRef } from 'react';
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FiHome, FiTrendingUp, FiZap, FiMusic, FiSettings, FiLayers, FiX, FiList, FiCompass, FiDownload } from 'react-icons/fi';
 import { IoGameControllerOutline, IoNewspaperOutline, IoFootballOutline } from 'react-icons/io5';
 import Logo from './Logo';
 
 const navItems = [
-  { id: 'home', icon: FiHome, label: 'Home' },
-  { id: 'trending', icon: FiTrendingUp, label: 'Trending' },
-  { id: 'shorts', icon: FiZap, label: 'Shorts' },
-  { id: 'music', icon: FiMusic, label: 'Music' },
-  { id: 'gaming', icon: IoGameControllerOutline, label: 'Gaming' },
-  { id: 'news', icon: IoNewspaperOutline, label: 'News' },
-  { id: 'sports', icon: IoFootballOutline, label: 'Sports' },
-  { id: 'explore', icon: FiCompass, label: 'Explore' },
+  { id: 'home', icon: FiHome, label: 'Home', path: '/' },
+  { id: 'trending', icon: FiTrendingUp, label: 'Trending', path: '/category/trending' },
+  { id: 'shorts', icon: FiZap, label: 'Shorts', path: '/search/trending%20shorts' },
+  { id: 'music', icon: FiMusic, label: 'Music', path: '/category/music' },
+  { id: 'gaming', icon: IoGameControllerOutline, label: 'Gaming', path: '/category/gaming' },
+  { id: 'news', icon: IoNewspaperOutline, label: 'News', path: '/category/news' },
+  { id: 'sports', icon: IoFootballOutline, label: 'Sports', path: '/category/sports' },
+  { id: 'explore', icon: FiCompass, label: 'Explore', path: '/explore' },
 ];
 
-export default function Sidebar({ open, onClose, active, onNavigate, user, onSettings, onBgSettings, onDownloaded }) {
+export default function Sidebar({ open, onClose, user, onSettings, onBgSettings }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path;
+  };
+
+  const handleNav = (path) => {
+    navigate(path);
+    if (window.innerWidth < 1024) onClose();
+  };
+
   return (
     <>
       <div className={`fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm transition-opacity lg:hidden ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose} />
       <aside className={`fixed top-0 left-0 bottom-0 w-64 z-[95] glass-strong border-r border-vf-border/50 flex flex-col transition-transform duration-300 lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-4 border-b border-vf-border/30 flex items-center justify-between">
-          <div onClick={() => { onNavigate('home'); onClose(); }} className="cursor-pointer">
+          <div onClick={() => handleNav('/')} className="cursor-pointer">
             <Logo size="sm" />
           </div>
           <button className="lg:hidden p-1.5 hover:bg-vf-card rounded-lg" onClick={onClose}>
@@ -31,19 +45,18 @@ export default function Sidebar({ open, onClose, active, onNavigate, user, onSet
 
         <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1">
           <p className="text-[10px] uppercase tracking-widest text-vf-gray font-bold px-3 mb-2 mt-1">Discover</p>
-          {navItems.map((item, i) => (
+          {navItems.map((item) => (
             <button key={item.id}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative ${
-                active === item.id
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative ${
+                isActive(item.path)
                   ? 'bg-vf-red/15 text-white'
                   : 'text-vf-gray hover:text-white hover:bg-vf-card/70'
               }`}
-              style={{ animationDelay: `${i * 40}ms` }}
-              onClick={() => { onNavigate(item.id); if (window.innerWidth < 1024) onClose(); }}>
-              {active === item.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 gr-red rounded-r-full" />}
-              <item.icon size={18} className={active === item.id ? 'text-vf-red' : ''} />
+              onClick={() => handleNav(item.path)}>
+              {isActive(item.path) && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 gr-red rounded-r-full" />}
+              <item.icon size={18} className={isActive(item.path) ? 'text-vf-red' : ''} />
               <span>{item.label}</span>
-              {active === item.id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-vf-red" />}
+              {isActive(item.path) && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-vf-red" />}
             </button>
           ))}
 
@@ -51,17 +64,17 @@ export default function Sidebar({ open, onClose, active, onNavigate, user, onSet
 
           <p className="text-[10px] uppercase tracking-widest text-vf-gray font-bold px-3 mb-2">Library</p>
           <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-            active === 'playlists' ? 'bg-vf-red/15 text-white' : 'text-vf-gray hover:text-white hover:bg-vf-card/70'
+            isActive('/playlists') ? 'bg-vf-red/15 text-white' : 'text-vf-gray hover:text-white hover:bg-vf-card/70'
           }`}
-            onClick={() => { onNavigate('playlists'); if (window.innerWidth < 1024) onClose(); }}>
-            <FiList size={18} className={active === 'playlists' ? 'text-vf-red' : ''} />
+            onClick={() => handleNav('/playlists')}>
+            <FiList size={18} className={isActive('/playlists') ? 'text-vf-red' : ''} />
             Playlists
           </button>
           <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-            active === 'downloads' ? 'bg-vf-red/15 text-white' : 'text-vf-gray hover:text-white hover:bg-vf-card/70'
+            isActive('/downloads') ? 'bg-vf-red/15 text-white' : 'text-vf-gray hover:text-white hover:bg-vf-card/70'
           }`}
-            onClick={() => { onDownloaded(); if (window.innerWidth < 1024) onClose(); }}>
-            <FiDownload size={18} className={active === 'downloads' ? 'text-vf-red' : ''} />
+            onClick={() => handleNav('/downloads')}>
+            <FiDownload size={18} className={isActive('/downloads') ? 'text-vf-red' : ''} />
             Downloads
           </button>
 
