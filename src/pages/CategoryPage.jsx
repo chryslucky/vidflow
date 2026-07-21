@@ -31,38 +31,48 @@ export default function CategoryPage() {
   const [loading, setLoading] = useState(true);
   const [pageToken, setPageToken] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const loadedRef = useRef('');
+  const loadingMoreRef = useRef(false);
+  const pageTokenRef = useRef(null);
+  const categoryRef = useRef(category);
 
   const cat = CATEGORY_MAP[category];
 
   const loadContent = useCallback(async () => {
     if (loadedRef.current === category) return;
     loadedRef.current = category;
+    categoryRef.current = category;
 
     setLoading(true);
     setVideos([]);
     setHeroVideos([]);
+    setHasMore(true);
+    pageTokenRef.current = null;
 
     let allVideos = [];
     let nextToken = null;
 
     if (category === 'trending' || category === 'all') {
       const pop1 = await getPopularVideos(user?.country || 'US', 50);
-      if (pop1?.items) {
+      if (pop1?.items && pop1.items.length) {
         allVideos = pop1.items;
         nextToken = pop1.nextPageToken;
         setVideos(allVideos);
         setLoading(false);
-        
-        // Load 50 more
+
         if (nextToken) {
           const pop2 = await getPopularVideos(user?.country || 'US', 50, nextToken);
-          if (pop2?.items) {
+          if (pop2?.items && pop2.items.length) {
             allVideos = [...allVideos, ...pop2.items];
             setVideos(allVideos);
             nextToken = pop2.nextPageToken;
+          } else {
+            nextToken = null;
           }
         }
+      } else {
+        setLoading(false);
       }
     } else if (category === 'recently') {
       const result = await searchVideosFull('new today trending', 30);
@@ -73,20 +83,30 @@ export default function CategoryPage() {
       setLoading(false);
     } else if (cat) {
       const data = await getPopularVideos(user?.country || 'US', 50, '', cat.id);
-      if (data?.items) {
+      if (data?.items && data.items.length) {
         allVideos = data.items;
         nextToken = data.nextPageToken;
         setVideos(allVideos);
         setLoading(false);
-        
+
         if (nextToken) {
           const data2 = await getPopularVideos(user?.country || 'US', 50, nextToken, cat.id);
-          if (data2?.items) {
+          if (data2?.items && data2.items.length) {
             allVideos = [...allVideos, ...data2.items];
             setVideos(allVideos);
             nextToken = data2.nextPageToken;
+          } else {
+            nextToken = null;
           }
         }
+      } else {
+        // Fallback: search by category name
+        const result = await searchVideosFull(category, 30);
+        if (result?.videos) {
+          allVideos = result.videos;
+          setVideos(allVideos);
+        }
+        setLoading(false);
       }
     } else {
       const result = await searchVideosFull(category, 30);
@@ -97,14 +117,15 @@ export default function CategoryPage() {
       setLoading(false);
     }
 
-    // Set hero
     const heroItems = [...allVideos]
       .filter(v => v.statistics?.viewCount)
       .sort((a, b) => parseInt(b.statistics.viewCount) - parseInt(a.statistics.viewCount))
       .slice(0, 5);
     setHeroVideos(heroItems.length ? heroItems : allVideos.slice(0, 5));
-    
+
     setPageToken(nextToken || null);
+    pageTokenRef.current = nextToken || null;
+    if (!nextToken) setHasMore(false);
   }, [category, user, cat]);
 
   useEffect(() => {
@@ -112,34 +133,47 @@ export default function CategoryPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [loadContent]);
 
-  // Infinite scroll
+  const loadMore = useCallback(async () => {
+    const token = pageTokenRef.current;
+    if (loadingMoreRef.current || !token) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    let data;
+    if (category === 'trending' || category === 'all') {
+      data = await getPopularVideos(user?.country || 'US', 50, token);
+    } else if (cat) {
+      data = await getPopularVideos(user?.country || 'US', 50, token, cat.id);
+    }
+
+    if (data?.items && data.items.length) {
+      setVideos(prev => [...prev, ...data.items]);
+      const finalToken = data.nextPageToken || null;
+      setPageToken(finalToken);
+      pageTokenRef.current = finalToken;
+      if (!finalToken) setHasMore(false);
+    } else {
+      setPageToken(null);
+      pageTokenRef.current = null;
+      setHasMore(false);
+    }
+
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+  }, [category, user, cat]);
+
   useEffect(() => {
-    if (loadingMore || !pageToken) return;
     const handler = () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800) {
+      if (loadingMoreRef.current || !pageTokenRef.current) return;
+      const scrollPos = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 1000;
+      if (scrollPos >= threshold) {
         loadMore();
       }
     };
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
-    // eslint-disable-next-line
-  }, [loadingMore, pageToken]);
-
-  const loadMore = async () => {
-    if (loadingMore || !pageToken) return;
-    setLoadingMore(true);
-    let data;
-    if (category === 'trending' || category === 'all') {
-      data = await getPopularVideos(user?.country || 'US', 50, pageToken);
-    } else if (cat) {
-      data = await getPopularVideos(user?.country || 'US', 50, pageToken, cat.id);
-    }
-    if (data?.items) {
-      setVideos(prev => [...prev, ...data.items]);
-      setPageToken(data.nextPageToken || null);
-    }
-    setLoadingMore(false);
-  };
+  }, [loadMore]);
 
   const title = cat?.label || (category.charAt(0).toUpperCase() + category.slice(1));
 
@@ -170,6 +204,12 @@ export default function CategoryPage() {
             <div className="w-6 h-6 rounded-full border-2 border-vf-border animate-spin" style={{ borderTopColor: '#e50914' }} />
             <span className="text-sm">Loading more...</span>
           </div>
+        </div>
+      )}
+
+      {!hasMore && videos.length > 0 && !loadingMore && (
+        <div className="text-center py-8 text-vf-gray text-sm">
+          End of results • {videos.length} videos loaded
         </div>
       )}
     </div>

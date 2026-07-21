@@ -3,8 +3,38 @@ import axios from 'axios';
 const API_KEY = 'AIzaSyCJ8Zyto23dvlM0o9IK8TmUrFBvKPinDz8';
 const BASE = 'https://www.googleapis.com/youtube/v3';
 
+// YouTube mostPopular chart supported regions
+const SUPPORTED_REGIONS = new Set([
+  'DZ','AR','AU','AT','AZ','BH','BD','BY','BE','BO','BA','BR','BG','KH','CA','CL',
+  'CO','CR','HR','CY','CZ','DK','DO','EC','EG','SV','EE','FI','FR','GE','DE','GH',
+  'GR','GT','HN','HK','HU','IS','IN','ID','IQ','IE','IL','IT','JM','JP','JO','KZ',
+  'KE','KW','LV','LB','LY','LI','LT','LU','MY','MT','MX','ME','MA','NP','NL','NZ',
+  'NI','NG','MK','NO','OM','PK','PA','PG','PY','PE','PH','PL','PT','PR','QA','RO',
+  'RU','SA','SN','RS','SG','SK','SI','ZA','KR','ES','LK','SE','CH','TW','TZ','TH',
+  'TN','TR','UG','UA','AE','GB','US','UY','VE','VN','YE','ZW'
+]);
+
+// Fallback region if user's region isn't supported
+const REGION_FALLBACK = {
+  'RW': 'UG', // Rwanda -> Uganda
+  'BI': 'UG', // Burundi -> Uganda
+  'CD': 'UG', // DR Congo -> Uganda
+  'MG': 'ZA', // Madagascar -> South Africa
+  'CM': 'NG', // Cameroon -> Nigeria
+  'CI': 'GH', // Ivory Coast -> Ghana
+  'ET': 'KE', // Ethiopia -> Kenya
+};
+
+function getSafeRegion(region) {
+  if (!region) return 'US';
+  const upper = region.toUpperCase();
+  if (SUPPORTED_REGIONS.has(upper)) return upper;
+  if (REGION_FALLBACK[upper]) return REGION_FALLBACK[upper];
+  return 'US';
+}
+
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 export function clearApiCache() { cache.clear(); }
 
@@ -25,7 +55,23 @@ export async function ytApi(endpoint, params = {}, useCache = true) {
     }
     return null;
   } catch (err) {
-    console.warn(`YT API [${endpoint}]:`, err?.response?.data?.error?.message || err.message);
+    const errMsg = err?.response?.data?.error?.message || err.message;
+    console.warn(`YT API [${endpoint}]:`, errMsg);
+    
+    // Auto-retry with US region if region-related error
+    if (params.regionCode && params.regionCode !== 'US' && errMsg.toLowerCase().includes('region')) {
+      console.log('Retrying with US region...');
+      const retryParams = { ...params, regionCode: 'US' };
+      try {
+        const retry = await axios.get(`${BASE}/${endpoint}`, { params: retryParams, timeout: 15000 });
+        if (retry.data) {
+          cache.set(cacheKey, { data: retry.data, time: Date.now() });
+          return retry.data;
+        }
+      } catch (retryErr) {
+        console.warn('Retry also failed:', retryErr.message);
+      }
+    }
     return null;
   }
 }
@@ -44,7 +90,6 @@ export async function getVideoDetails(ids) {
   return results;
 }
 
-// FIXED: Proper search that returns actual results
 export async function searchVideos(query, maxResults = 25, pageToken = '', useCache = true) {
   if (!query || !query.trim()) return null;
   const params = {
@@ -59,26 +104,20 @@ export async function searchVideos(query, maxResults = 25, pageToken = '', useCa
   return ytApi('search', params, useCache);
 }
 
-// New: full-featured search that returns detailed videos
 export async function searchVideosFull(query, maxResults = 25, pageToken = '') {
   const searchData = await searchVideos(query, maxResults, pageToken, false);
   if (!searchData?.items?.length) return { videos: [], nextPageToken: null };
-  
-  const ids = searchData.items
-    .map(i => i.id?.videoId)
-    .filter(Boolean);
-  
+
+  const ids = searchData.items.map(i => i.id?.videoId).filter(Boolean);
   if (!ids.length) return { videos: [], nextPageToken: searchData.nextPageToken };
-  
+
   const details = await getVideoDetails(ids);
-  
-  // Preserve search order
   const detailsMap = new Map(details.map(d => [d.id, d]));
   const ordered = ids.map(id => detailsMap.get(id)).filter(Boolean);
-  
-  return { 
-    videos: ordered, 
-    nextPageToken: searchData.nextPageToken || null 
+
+  return {
+    videos: ordered,
+    nextPageToken: searchData.nextPageToken || null
   };
 }
 
@@ -108,10 +147,11 @@ export async function searchChannels(query, maxResults = 5) {
 }
 
 export async function getPopularVideos(regionCode = 'US', maxResults = 50, pageToken = '', categoryId = '', useCache = true) {
+  const safeRegion = getSafeRegion(regionCode);
   const params = {
     part: 'snippet,statistics,contentDetails',
     chart: 'mostPopular',
-    regionCode,
+    regionCode: safeRegion,
     maxResults,
   };
   if (pageToken) params.pageToken = pageToken;
@@ -120,6 +160,7 @@ export async function getPopularVideos(regionCode = 'US', maxResults = 50, pageT
 }
 
 export async function getShorts(query = 'trending shorts', maxResults = 24, regionCode = 'US', pageToken = '') {
+  const safeRegion = getSafeRegion(regionCode);
   const params = {
     part: 'snippet',
     q: query,
@@ -127,7 +168,7 @@ export async function getShorts(query = 'trending shorts', maxResults = 24, regi
     videoDuration: 'short',
     maxResults,
     order: 'viewCount',
-    regionCode,
+    regionCode: safeRegion,
   };
   if (pageToken) params.pageToken = pageToken;
   return ytApi('search', params);

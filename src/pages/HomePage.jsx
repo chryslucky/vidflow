@@ -18,7 +18,10 @@ export default function HomePage({ refreshTrigger }) {
   const [pageToken, setPageToken] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [popularLoading, setPopularLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
   const loadedRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const pageTokenRef = useRef(null);
 
   const loadContent = useCallback(async (forceRefresh = false) => {
     if (loadedRef.current && !forceRefresh) return;
@@ -29,45 +32,53 @@ export default function HomePage({ refreshTrigger }) {
     const u = user || {};
     setPopularLoading(true);
     setPopular([]);
+    setHasMore(true);
 
     // Load first 50
     const pop1 = await getPopularVideos(u?.country || 'US', 50, '', '', !forceRefresh);
-    if (pop1?.items) {
+    if (pop1?.items && pop1.items.length) {
       setPopular(pop1.items);
-      
-      // Hero: top 5 by views
+
       const heroItems = [...pop1.items]
         .filter(v => v.statistics?.viewCount)
         .sort((a, b) => parseInt(b.statistics.viewCount) - parseInt(a.statistics.viewCount))
         .slice(0, 5);
       setHeroVideos(heroItems.length ? heroItems : pop1.items.slice(0, 5));
-      
-      setPageToken(pop1.nextPageToken || null);
+
+      const nextToken1 = pop1.nextPageToken || null;
+      setPageToken(nextToken1);
+      pageTokenRef.current = nextToken1;
       setPopularLoading(false);
 
-      // Load second 50 to make 100 total
-      if (pop1.nextPageToken) {
-        const pop2 = await getPopularVideos(u?.country || 'US', 50, pop1.nextPageToken, '', !forceRefresh);
-        if (pop2?.items) {
+      // Load second 50 to reach 100
+      if (nextToken1) {
+        const pop2 = await getPopularVideos(u?.country || 'US', 50, nextToken1, '', !forceRefresh);
+        if (pop2?.items && pop2.items.length) {
           setPopular(prev => [...prev, ...pop2.items]);
-          setPageToken(pop2.nextPageToken || null);
+          const nextToken2 = pop2.nextPageToken || null;
+          setPageToken(nextToken2);
+          pageTokenRef.current = nextToken2;
+          if (!nextToken2) setHasMore(false);
+        } else {
+          setHasMore(false);
         }
+      } else {
+        setHasMore(false);
       }
     } else {
       setPopularLoading(false);
+      setHasMore(false);
     }
 
-    // Shorts
+    // Load other sections
     const interest = u?.interests?.[Math.floor(Math.random() * (u?.interests?.length || 1))] || 'trending';
     const sh = await getShorts(interest + ' shorts', 24, u?.country || 'US');
     if (sh?.items) setShorts(sh.items);
 
-    // For You
     const fyQ = u?.interests?.[Math.floor(Math.random() * (u?.interests?.length || 1))] || 'popular';
     const fyData = await searchVideosFull(fyQ, 12);
     if (fyData?.videos) setForYou(fyData.videos);
 
-    // Music
     const mData = await getPopularVideos(u?.country || 'US', 12, '', '10', !forceRefresh);
     if (mData?.items) setMusicVids(mData.items);
   }, [user]);
@@ -83,37 +94,57 @@ export default function HomePage({ refreshTrigger }) {
     }
   }, [refreshTrigger, loadContent]);
 
-  // Infinite scroll
+  // FIXED Infinite scroll
+  const loadMore = useCallback(async () => {
+    const token = pageTokenRef.current;
+    if (loadingMoreRef.current || !token) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    // Load 100 more (2 batches of 50)
+    const data = await getPopularVideos(user?.country || 'US', 50, token);
+    if (data?.items && data.items.length) {
+      setPopular(prev => [...prev, ...data.items]);
+      const nextToken = data.nextPageToken;
+      if (nextToken) {
+        const data2 = await getPopularVideos(user?.country || 'US', 50, nextToken);
+        if (data2?.items && data2.items.length) {
+          setPopular(prev => [...prev, ...data2.items]);
+          const finalToken = data2.nextPageToken || null;
+          setPageToken(finalToken);
+          pageTokenRef.current = finalToken;
+          if (!finalToken) setHasMore(false);
+        } else {
+          setPageToken(nextToken);
+          pageTokenRef.current = nextToken;
+        }
+      } else {
+        setPageToken(null);
+        pageTokenRef.current = null;
+        setHasMore(false);
+      }
+    } else {
+      setPageToken(null);
+      pageTokenRef.current = null;
+      setHasMore(false);
+    }
+
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+  }, [user]);
+
   useEffect(() => {
-    if (loadingMore || !pageToken) return;
     const handler = () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800) {
+      if (loadingMoreRef.current || !pageTokenRef.current) return;
+      const scrollPos = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 1000;
+      if (scrollPos >= threshold) {
         loadMore();
       }
     };
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
-    // eslint-disable-next-line
-  }, [loadingMore, pageToken]);
-
-  const loadMore = async () => {
-    if (loadingMore || !pageToken) return;
-    setLoadingMore(true);
-    // Load 100 more (2 pages)
-    const data = await getPopularVideos(user?.country || 'US', 50, pageToken);
-    if (data?.items) {
-      setPopular(prev => [...prev, ...data.items]);
-      const nextToken = data.nextPageToken;
-      if (nextToken) {
-        const data2 = await getPopularVideos(user?.country || 'US', 50, nextToken);
-        if (data2?.items) {
-          setPopular(prev => [...prev, ...data2.items]);
-          setPageToken(data2.nextPageToken || null);
-        } else setPageToken(nextToken);
-      } else setPageToken(null);
-    }
-    setLoadingMore(false);
-  };
+  }, [loadMore]);
 
   const scrollShorts = (dir) => {
     const el = document.getElementById('shortsRow');
@@ -224,6 +255,12 @@ export default function HomePage({ refreshTrigger }) {
             <div className="w-6 h-6 rounded-full border-2 border-vf-border animate-spin" style={{ borderTopColor: '#e50914' }} />
             <span className="text-sm">Loading 100 more videos...</span>
           </div>
+        </div>
+      )}
+
+      {!hasMore && popular.length > 0 && !loadingMore && (
+        <div className="text-center py-8 text-vf-gray text-sm">
+          You've reached the end • {popular.length} videos loaded
         </div>
       )}
     </>
