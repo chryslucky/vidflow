@@ -19,3 +19,7 @@ export async function clearBgImages(){try{await localforage.removeItem(KEYS.BG_I
 export async function getSavedVideos(){try{return(await localforage.getItem(KEYS.SAVED))||[];}catch{return[];}}
 export async function saveSavedVideo(video){try{const list=await getSavedVideos();if(list.some(v=>v.videoId===video.videoId))return list;const updated=[{...video,savedAt:Date.now()},...list].slice(0,500);await localforage.setItem(KEYS.SAVED,updated);return updated;}catch{return[];}}
 export async function removeSavedVideo(videoId){try{const list=await getSavedVideos();const updated=list.filter(v=>v.videoId!==videoId);await localforage.setItem(KEYS.SAVED,updated);return updated;}catch{return[];}}
+
+export const getDownloaded = getSavedVideos;
+export const saveDownloaded = saveSavedVideo;
+export const removeDownloaded = removeSavedVideo;
