@@ -50,21 +50,8 @@ export default function HomePage({ refreshTrigger }) {
       pageTokenRef.current = nextToken1;
       setPopularLoading(false);
 
-      // Load second 50 to reach 100
-      if (nextToken1) {
-        const pop2 = await getPopularVideos(u?.country || 'US', 50, nextToken1, '', !forceRefresh);
-        if (pop2?.items && pop2.items.length) {
-          setPopular(prev => [...prev, ...pop2.items]);
-          const nextToken2 = pop2.nextPageToken || null;
-          setPageToken(nextToken2);
-          pageTokenRef.current = nextToken2;
-          if (!nextToken2) setHasMore(false);
-        } else {
-          setHasMore(false);
-        }
-      } else {
-        setHasMore(false);
-      }
+      // Remaining pages are loaded by the infinite-scroll handler on demand.
+
     } else {
       setPopularLoading(false);
       setHasMore(false);
@@ -84,7 +71,8 @@ export default function HomePage({ refreshTrigger }) {
   }, [user]);
 
   useEffect(() => {
-    loadContent();
+    const timer = setTimeout(() => loadContent(), 0);
+    return () => clearTimeout(timer);
   }, [loadContent]);
 
   useEffect(() => {

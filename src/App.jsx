@@ -32,7 +32,7 @@ function AppShell() {
     sidebarOpen, setSidebarOpen,
     videoModalId, setVideoModalId,
     shortsModal, setShortsModal,
-    miniPlayer,
+    miniPlayer, setMiniPlayer,
     channelId, setChannelId,
     plModal, setPlModal,
     showAd, setShowAd,
@@ -129,7 +129,7 @@ function AppShell() {
 
       {miniPlayer && (
         <MiniPlayer videoId={miniPlayer.videoId} title={miniPlayer.title}
-          onExpand={handleExpandMini} onClose={() => useApp().setMiniPlayer(null)} />
+          onExpand={handleExpandMini} onClose={() => setMiniPlayer(null)} />
       )}
 
       {channelId && (

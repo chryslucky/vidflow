@@ -4,6 +4,7 @@ import { FiMaximize2, FiX } from 'react-icons/fi';
 export default function MiniPlayer({ videoId, title, onExpand, onClose }) {
   const playerRef = useRef(null);
   const [pos, setPos] = useState({ x: null, y: null });
+  const [loaded, setLoaded] = useState(false);
   const dragRef = useRef({ active: false, sx: 0, sy: 0, sl: 0, st: 0 });
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function MiniPlayer({ videoId, title, onExpand, onClose }) {
     right: pos.x !== null ? 'auto' : '20px',
     ...(pos.x !== null && { left: pos.x + 'px' }),
     ...(pos.y !== null && { top: pos.y + 'px' }),
-    width: '380px',
+    width: 'min(380px, calc(100vw - 24px))',
   };
 
   return (
@@ -61,10 +62,10 @@ export default function MiniPlayer({ videoId, title, onExpand, onClose }) {
           </button>
         </div>
       </div>
-      <div className="aspect-video bg-black">
+      <div className="relative aspect-video bg-black"><div className={`absolute inset-0 flex items-center justify-center text-xs text-vf-gray transition-opacity ${loaded ? "opacity-0" : "opacity-100"}`}>Loading player…</div>
         <iframe src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
           className="w-full h-full" frameBorder="0"
-          allow="accelerometer; autoplay; encrypted-media" allowFullScreen />
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen onLoad={() => setLoaded(true)} />
       </div>
     </div>
   );

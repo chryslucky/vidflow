@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiPlay, FiPlus, FiEye, FiClock, FiCheck, FiMoreVertical } from 'react-icons/fi';
+import { FiPlay, FiPlus, FiEye, FiClock, FiMoreVertical, FiShare2 } from 'react-icons/fi';
 import { formatNumber, timeAgo, parseDuration, getThumb, getVideoId } from '../utils/helpers';
 import { getVideoState } from '../utils/storage';
 
@@ -110,11 +110,29 @@ export default function VideoCard({ video, onPlay, onChannel, onSave, index = 0 
             <span>{timeAgo(snippet.publishedAt)}</span>
           </div>
         </div>
-        <button 
-          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-vf-card rounded-full transition-all self-start flex-shrink-0"
-          onClick={(e) => { e.stopPropagation(); onSave?.(vid, snippet.title); }}>
-          <FiMoreVertical size={16} className="text-vf-gray" />
-        </button>
+        <div className="flex items-center gap-1 self-start flex-shrink-0">
+          <button
+            className="p-2 bg-black/60 rounded-full hover:bg-vf-red transition-colors md:opacity-0 md:group-hover:opacity-100"
+            onClick={(e) => { e.stopPropagation(); onSave?.(vid, snippet.title); }}
+            aria-label="Save video"
+            title="Save video">
+            <FiPlus size={15} />
+          </button>
+          <button
+            className="p-2 bg-black/60 rounded-full hover:bg-vf-red transition-colors md:opacity-0 md:group-hover:opacity-100"
+            onClick={async (e) => { e.stopPropagation(); const url = `https://www.youtube.com/watch?v=${vid}`; try { if (navigator.share) await navigator.share({ title: snippet.title, url }); else await navigator.clipboard.writeText(url); } catch {} }}
+            aria-label="Share video"
+            title="Share video">
+            <FiShare2 size={15} />
+          </button>
+          <button
+            className="p-2 bg-black/60 rounded-full hover:bg-vf-card transition-colors md:opacity-0 md:group-hover:opacity-100"
+            onClick={(e) => { e.stopPropagation(); onSave?.(vid, snippet.title); }}
+            aria-label="More actions"
+            title="More actions">
+            <FiMoreVertical size={16} className="text-vf-gray" />
+          </button>
+        </div>
       </div>
     </div>
   );
