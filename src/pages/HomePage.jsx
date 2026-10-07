@@ -84,7 +84,8 @@ export default function HomePage({ refreshTrigger }) {
   }, [user]);
 
   useEffect(() => {
-    loadContent();
+    const timer = setTimeout(() => loadContent(), 0);
+    return () => clearTimeout(timer);
   }, [loadContent]);
 
   useEffect(() => {
