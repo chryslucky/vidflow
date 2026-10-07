@@ -61,16 +61,6 @@ export default function CategoryPage() {
         setVideos(allVideos);
         setLoading(false);
 
-        if (nextToken) {
-          const pop2 = await getPopularVideos(user?.country || 'US', 50, nextToken);
-          if (pop2?.items && pop2.items.length) {
-            allVideos = [...allVideos, ...pop2.items];
-            setVideos(allVideos);
-            nextToken = pop2.nextPageToken;
-          } else {
-            nextToken = null;
-          }
-        }
       } else {
         setLoading(false);
       }
@@ -89,16 +79,6 @@ export default function CategoryPage() {
         setVideos(allVideos);
         setLoading(false);
 
-        if (nextToken) {
-          const data2 = await getPopularVideos(user?.country || 'US', 50, nextToken, cat.id);
-          if (data2?.items && data2.items.length) {
-            allVideos = [...allVideos, ...data2.items];
-            setVideos(allVideos);
-            nextToken = data2.nextPageToken;
-          } else {
-            nextToken = null;
-          }
-        }
       } else {
         // Fallback: search by category name
         const result = await searchVideosFull(category, 30);
